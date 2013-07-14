@@ -17,13 +17,13 @@ namespace HyperEdit
             Contents = new List<IWindowContent>
                 {
                     new Button("Close", CloseWindow),
-                    new TextBox("Latitude", "0"),
-                    new TextBox("Longitude", "0"),
+                    new TextBox("Latitude", "0° 0' 0\""),
+                    new TextBox("Longitude", "0° 0' 0\""),
                     new TextBox("Altitude", "50"),
                     new Button("Land", LandAtTarget),
-                    new Button("Save coordanates", SaveCoords),
-                    new Button("Load coordanates", LoadCoords),
-                    new Button("Delete coordanates", DeleteCoords),
+                    new Button("Save coordinates", SaveCoords),
+                    new Button("Load coordinates", LoadCoords),
+                    new Button("Delete coordinates", DeleteCoords),
                     new Button("Set to current position", SetCurrent)
                 };
         }
@@ -32,13 +32,13 @@ namespace HyperEdit
         {
             if (this.ActiveVesselNullcheck())
                 return;
-            SetField<TextBox, string>("Latitude", FlightGlobals.ActiveVessel.latitude.ToSiString());
-            SetField<TextBox, string>("Longitude", FlightGlobals.ActiveVessel.longitude.ToSiString());
+            SetField<TextBox, string>("Latitude", Coordinates.AngleToDMS(FlightGlobals.ActiveVessel.latitude));
+            SetField<TextBox, string>("Longitude", Coordinates.AngleToDMS(FlightGlobals.ActiveVessel.longitude));
         }
 
         private static void DeleteCoords()
         {
-            new Selector<string[]>("Select coordanates", LandingCoords, l => l[0], OnDeleteCoords).OpenWindow();
+            new Selector<string[]>("Select coordinates", LandingCoords, l => l[0], OnDeleteCoords).OpenWindow();
         }
 
         private static void OnDeleteCoords(string[] line)
@@ -50,7 +50,7 @@ namespace HyperEdit
 
         private void LoadCoords()
         {
-            new Selector<string[]>("Select coordanates", LandingCoords, l => l[0], OnLoadCoords).OpenWindow();
+            new Selector<string[]>("Select coordinates", LandingCoords, l => l[0], OnLoadCoords).OpenWindow();
         }
 
         private void OnLoadCoords(string[] line)
@@ -91,33 +91,58 @@ namespace HyperEdit
             }
         }
 
+        //private void LandAtTarget()
+        //{
+        //    if (this.ActiveVesselNullcheck())
+        //        return;
+        //    double latitude, longitude, altitude;
+        //    if (Si.TryParse(FindField<TextBox, string>("Latitude"), out latitude) == false ||
+        //        Si.TryParse(FindField<TextBox, string>("Longitude"), out longitude) == false ||
+        //        Si.TryParse(FindField<TextBox, string>("Altitude"), out altitude) == false)
+        //    {
+        //        ErrorPopup.Error("Landing parameter was not a number");
+        //        return;
+        //    }
+        //    if (FlightGlobals.fetch == null || FlightGlobals.ActiveVessel == null)
+        //    {
+        //        ErrorPopup.Error("Could not find active vessel");
+        //        return;
+        //    }
+        //    var lander = FlightGlobals.ActiveVessel.GetComponent<LanderAttachment>();
+        //    if (lander == null)
+        //    {
+        //        lander = FlightGlobals.ActiveVessel.gameObject.AddComponent<LanderAttachment>();
+        //        lander.Latitude = latitude;
+        //        lander.Longitude = longitude;
+        //        lander.Altitude = altitude;
+        //    }
+        //    else
+        //        UnityEngine.Object.Destroy(lander);
+        //}
+
         private void LandAtTarget()
         {
-            if (this.ActiveVesselNullcheck())
-                return;
-            double latitude, longitude, altitude;
-            if (Si.TryParse(FindField<TextBox, string>("Latitude"), out latitude) == false ||
-                Si.TryParse(FindField<TextBox, string>("Longitude"), out longitude) == false ||
-                Si.TryParse(FindField<TextBox, string>("Altitude"), out altitude) == false)
-            {
-                ErrorPopup.Error("Landing parameter was not a number");
-                return;
-            }
-            if (FlightGlobals.fetch == null || FlightGlobals.ActiveVessel == null)
-            {
-                ErrorPopup.Error("Could not find active vessel");
-                return;
-            }
-            var lander = FlightGlobals.ActiveVessel.GetComponent<LanderAttachment>();
+            if (this.ActiveVesselNullcheck()) return;
+
+            string longitude = FindField<TextBox, string>("Longitude");
+            string latitude = FindField<TextBox, string>("Latitude");
+
+            Coordinates tgt = new Coordinates(Coordinates.AngleFromDMS(latitude), Coordinates.AngleFromDMS(longitude));
+            double altitude;
+
+            if (!(tgt.latitude > 0 && tgt.longitude > 0)) { ErrorPopup.Error("Corrdinates are not correct"); return; }
+            if (!Si.TryParse(FindField<TextBox, string>("Altitude"), out altitude)) { ErrorPopup.Error("Altitude is not correct"); return; }
+            if (FlightGlobals.fetch == null || FlightGlobals.ActiveVessel == null) { ErrorPopup.Error("Cannot find active vessel"); return; }
+
+            LanderAttachment lander = FlightGlobals.ActiveVessel.GetComponent<LanderAttachment>();
             if (lander == null)
             {
                 lander = FlightGlobals.ActiveVessel.gameObject.AddComponent<LanderAttachment>();
-                lander.Latitude = latitude;
-                lander.Longitude = longitude;
+                lander.Latitude = tgt.latitude;
+                lander.Longitude = tgt.longitude;
                 lander.Altitude = altitude;
             }
-            else
-                UnityEngine.Object.Destroy(lander);
+            else UnityEngine.Object.Destroy(lander);
         }
     }
 

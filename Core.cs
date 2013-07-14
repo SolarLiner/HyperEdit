@@ -26,7 +26,7 @@ namespace HyperEdit
 
         public void Update()
         {
-            if ((Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt)) && Input.GetKeyDown(KeyCode.H) || Input.GetKeyDown(KeyCode.F11))
+            if ((Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt)) && Input.GetKeyDown(KeyCode.H))
                 HyperEditWindow.OpenWindow();
         }
     }
@@ -264,6 +264,132 @@ namespace HyperEdit
         public static string Aggregate(this IEnumerable<string> source, string middle)
         {
             return source.Aggregate("", (total, part) => total + middle + part).Substring(middle.Length);
+        }
+    }
+
+
+    /// <summary>
+    /// This class handles KSP <-> HyperEdit interaction. Picking funcs and "say something to the screen in order for him to show it to the player" ahead !
+    /// </summary>
+    public static class Interaction
+    {
+        static bool IsPickingActivated = false;
+        
+        /// <summary>
+        /// Shows "<paramref name="message"/>" for 3 seconds in the upper center of the screen, like the "Time Warp xNN"
+        /// </summary>
+        /// <param name="message">Message to show</param>
+        public static void Say(string message)
+        {
+            ScreenMessages.PostScreenMessage(new ScreenMessage(message, 3.0f, ScreenMessageStyle.UPPER_CENTER));
+        }
+
+        /// <summary>
+        /// Shows "<paramref name="message"/>" for <paramref name="duration" /> seconds, like the "Time Warp xNN"
+        /// </summary>
+        /// <param name="message">Message to show</param>
+        /// <param name="duration">Duration in seconds</param>
+        public static void Say(string message, double duration)
+        {
+            ScreenMessages.PostScreenMessage(new ScreenMessage(message, (float)duration, ScreenMessageStyle.UPPER_CENTER));
+        }
+
+        
+        /// <summary>
+        /// Thanks on MechJeb for this one. Shows the player the map to let him choose coordinates.
+        /// </summary>
+        public static void PickCoords()
+        {
+            if (!IsPickingActivated) return;
+            if (!MapView.MapIsEnabled) MapView.EnterMapView();
+
+
+        }
+    }
+    
+    /// <summary>
+    /// Coordinates things, ripped from MechJeb too, this thing is too damn awesome :D
+    /// Gives funcs to input and output real DMS formatted strings.
+    /// </summary>
+    public class Coordinates
+    {
+        public double latitude;
+        public double longitude;
+
+        public string DMSlatitude /// Latitude in DMS format (x° x' x")
+        {
+            get { return AngleToDMS(latitude); }
+            set { latitude = AngleFromDMS(value); }
+        }
+        public string DMSlongitude /// Longitude in DMS format (x° x' x")
+        {
+            get { return AngleToDMS(longitude); }
+            set { longitude = AngleFromDMS(value); }
+        }
+
+        public Coordinates(double latitude, double longitude)
+        {
+            this.latitude = latitude;
+            this.longitude = longitude;
+        }
+
+        public static string ToStringDecimal(double latitude, double longitude, bool newline = false, int precision = 3)
+        {
+            double clampedLongitude = ClampDegrees180(longitude);
+            double latitudeAbs = Math.Abs(latitude);
+            double longitudeAbs = Math.Abs(clampedLongitude);
+            return latitudeAbs.ToString("F" + precision) + "° " + (latitude > 0 ? "N" : "S") + (newline ? "\n" : ", ")
+                + longitudeAbs.ToString("F" + precision) + "° " + (clampedLongitude > 0 ? "E" : "W");
+        }
+
+        public string ToStringDecimal(bool newline = false, int precision = 3)
+        {
+            return ToStringDecimal(latitude, longitude, newline, precision);
+        }
+
+        public static string ToStringDMS(double latitude, double longitude, bool newline = false)
+        {
+            double clampedLongitude = ClampDegrees180(longitude);
+            return AngleToDMS(latitude) + (latitude > 0 ? " N" : " S") + (newline ? "\n" : ", ")
+                 + AngleToDMS(clampedLongitude) + (clampedLongitude > 0 ? " E" : " W");
+        }
+
+        public string ToStringDMS(bool newline = false)
+        {
+            return ToStringDMS(latitude, longitude, newline);
+        }
+
+        public static string AngleToDMS(double angle)
+        {
+            int degrees = (int)Math.Floor(Math.Abs(angle));
+            int minutes = (int)Math.Floor(60 * (Math.Abs(angle) - degrees));
+            int seconds = (int)Math.Floor(3600 * (Math.Abs(angle) - degrees - minutes / 60.0));
+
+            return String.Format("{0:0}° {1:00}' {2:00}\"", degrees, minutes, seconds);
+        }
+        public static double AngleFromDMS(string DMS)
+        {
+            if (!(DMS.Contains('°') && DMS.Contains('\'') && DMS.Contains('"'))) return -1;
+            string[] split = DMS.Split(new char[] {'°', '\'', '"'});
+
+            int degree = 0, minute = 0, second = 0;
+            if (!(int.TryParse(split[0], out degree) && int.TryParse(split[1], out minute) && int.TryParse(split[2], out second))) return -1;
+
+            return Math.Abs(degree + (minute / 60) + (second / 3600));
+        }
+
+        static double ClampDegrees180(double angle)
+        {
+            angle = ClampDegrees360(angle);
+            if (angle > 180) angle -= 360;
+            return angle;
+        }
+
+        static double ClampDegrees360(double angle)
+        {
+            angle = angle % 360.0;
+            if (angle < 0) return angle + 360.0;
+            else return angle;
         }
     }
 }
